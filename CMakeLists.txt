@@ -176,3 +176,24 @@ if(MSVC)
 else()
     target_compile_options(roster PRIVATE -Wall -Wextra)
 endif()
+
+# ===========================================================================
+# 6. Install / deploy.
+#    The build-tree exe links against the toolchain's shared runtime DLLs
+#    (libgcc, libstdc++, libprotobuf, libsqlite3, ...), which are only on PATH
+#    inside the MinGW/MSYS2 shell. `cmake --install build --prefix dist` (run
+#    from that shell) copies the exe plus every non-system DLL it needs into
+#    dist/bin, producing a folder that runs anywhere on the machine.
+# ===========================================================================
+if(WIN32 AND CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
+    # The toolchain's bin directory is where MinGW-distributed DLLs live.
+    get_filename_component(_toolchain_bin "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    install(TARGETS roster
+        RUNTIME_DEPENDENCIES
+            PRE_EXCLUDE_REGEXES  "api-ms-" "ext-ms-"
+            POST_EXCLUDE_REGEXES ".*[Ss]ystem32.*" ".*[Ww]indows[/\\\\].*"
+            DIRECTORIES "${_toolchain_bin}"
+        RUNTIME DESTINATION bin)
+else()
+    install(TARGETS roster RUNTIME DESTINATION bin)
+endif()

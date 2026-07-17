@@ -35,6 +35,21 @@ cmake --build build
 ./build/bin/roster.exe help
 ```
 
+The exe in `build/bin` links against MinGW runtime DLLs (libgcc, libstdc++,
+libprotobuf, ...), so it only runs where those are on PATH — i.e. inside the
+UCRT64 shell. To get a **self-contained folder that runs anywhere on the
+machine** (double-click, plain PowerShell, another directory), run the install
+step from the UCRT64 shell:
+
+```bash
+cmake --install build --prefix dist
+```
+
+This copies `roster.exe` plus every non-system DLL it needs into `dist/bin`.
+Note that `roster` is a console program: double-clicking it just flashes a
+window; run it from a terminal (`.\dist\bin\roster.exe help` works from plain
+PowerShell or cmd).
+
 ### (b) Visual Studio 2022 Build Tools + vcpkg
 
 Install the "Desktop development with C++" workload, then use vcpkg for the
