@@ -4,6 +4,8 @@
 #include <ctime>
 #include <fstream>
 #include <ios>
+#include <istream>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -32,29 +34,62 @@ std::string nowIso8601Local() {
 
 }  // namespace
 
-void saveRosterToProto(const std::vector<Person>& people,
-                       const std::string& path) {
+void saveRosterToProto(const std::vector<Person>& people, std::ostream& out) {
     roster::Roster message;
     message.set_exported_at(nowIso8601Local());
 
     for (const Person& p : people) {
-        roster::Person* out = message.add_people();
-        out->set_id(p.id);
-        out->set_first_name(p.first_name);
-        out->set_last_name(p.last_name);
-        out->set_role(p.role);
-        out->set_email(p.email);
-        out->set_active(p.active);
+        roster::Person* entry = message.add_people();
+        entry->set_id(p.id);
+        entry->set_first_name(p.first_name);
+        entry->set_last_name(p.last_name);
+        entry->set_role(p.role);
+        entry->set_email(p.email);
+        entry->set_active(p.active);
     }
 
+    if (!message.SerializeToOstream(&out)) {
+        throw ProtoIoException("Failed to serialize roster to the output stream.");
+    }
+}
+
+void saveRosterToProto(const std::vector<Person>& people,
+                       const std::string& path) {
     std::ofstream stream(path, std::ios::out | std::ios::binary | std::ios::trunc);
     if (!stream) {
         throw ProtoIoException("Could not open file for writing: " + path);
     }
 
-    if (!message.SerializeToOstream(&stream)) {
+    // Delegate the serialization to the stream overload so the wire format lives
+    // in exactly one place.
+    try {
+        saveRosterToProto(people, stream);
+    } catch (const ProtoIoException&) {
         throw ProtoIoException("Failed to serialize roster to: " + path);
     }
+}
+
+std::vector<Person> loadRosterFromProto(std::istream& in) {
+    roster::Roster message;
+    if (!message.ParseFromIstream(&in)) {
+        throw ProtoIoException(
+            "Failed to parse roster (not a valid roster file?).");
+    }
+
+    std::vector<Person> people;
+    people.reserve(static_cast<std::size_t>(message.people_size()));
+    for (int i = 0; i < message.people_size(); ++i) {
+        const roster::Person& entry = message.people(i);
+        Person p;
+        p.id = entry.id();
+        p.first_name = entry.first_name();
+        p.last_name = entry.last_name();
+        p.role = entry.role();
+        p.email = entry.email();
+        p.active = entry.active();
+        people.push_back(std::move(p));
+    }
+    return people;
 }
 
 std::vector<Person> loadRosterFromProto(const std::string& path) {
@@ -63,24 +98,12 @@ std::vector<Person> loadRosterFromProto(const std::string& path) {
         throw ProtoIoException("Could not open file for reading: " + path);
     }
 
-    roster::Roster message;
-    if (!message.ParseFromIstream(&stream)) {
+    // Delegate the parsing to the stream overload; only the "which file" context
+    // is added here.
+    try {
+        return loadRosterFromProto(stream);
+    } catch (const ProtoIoException&) {
         throw ProtoIoException(
             "Failed to parse roster (not a valid roster file?): " + path);
     }
-
-    std::vector<Person> people;
-    people.reserve(static_cast<std::size_t>(message.people_size()));
-    for (int i = 0; i < message.people_size(); ++i) {
-        const roster::Person& in = message.people(i);
-        Person p;
-        p.id = in.id();
-        p.first_name = in.first_name();
-        p.last_name = in.last_name();
-        p.role = in.role();
-        p.email = in.email();
-        p.active = in.active();
-        people.push_back(std::move(p));
-    }
-    return people;
 }
