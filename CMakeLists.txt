@@ -211,6 +211,15 @@ add_executable(roster
 
 add_dependencies(roster generate_proto)
 
+# Mirror the web UI into the build tree so the build-tree exe (build/bin) finds
+# it via its "../web" lookup, same as the dist layout. Kept in sync on every
+# build; when editing web/ live, run the server from the repo root instead (the
+# cwd lookup wins and picks up changes without a rebuild).
+add_custom_command(TARGET roster POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/web ${CMAKE_BINARY_DIR}/web
+    COMMENT "Copying web/ into the build tree")
+
 target_include_directories(roster
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
