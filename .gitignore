@@ -67,3 +67,24 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# SQLite database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Exported protobuf roster files
+*.pb
+
+# Generated protobuf sources (produced into the build tree, never committed)
+roster.pb.h
+roster.pb.cc
+
+# Editor / OS cruft
+.vs/
+.vscode/
+.idea/
+*.user
+.DS_Store
+Thumbs.db

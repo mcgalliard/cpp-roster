@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package roster;
+
+// A single person in the roster. Mirrors the in-memory Person struct and the
+// SQLite `people` table, but is used ONLY as the import/export wire format.
+message Person {
+  int32 id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string role = 4;
+  string email = 5;
+  bool active = 6;
+}
+
+// The full roster document written to / read from a .pb file.
+message Roster {
+  repeated Person people = 1;
+  string exported_at = 2; // ISO8601 timestamp, set at export time.
+}
