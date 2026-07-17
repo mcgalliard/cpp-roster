@@ -1,4 +1,4 @@
-# roster-manager
+# cpp-roster
 
 A small, teaching-quality command-line application for managing a roster of
 people. Data is persisted in **SQLite** (via the C API with a thin RAII
@@ -116,6 +116,8 @@ roster help
 **Import semantics:**
 - `--replace` clears the table, then inserts everyone from the file.
 - `--merge` inserts new people and updates existing rows matched **by email**.
+  People *without* an email can't be matched, so re-importing a file over a
+  database that already contains them creates duplicate rows.
 - Imported ids are **never trusted** — the database assigns ids on insert.
 
 ### Exit codes
@@ -123,9 +125,9 @@ roster help
 | Code | Meaning          |
 |------|------------------|
 | 0    | success          |
-| 1    | usage error (bad arguments, validation failure, unknown id) |
-| 2    | database error   |
-| 3    | proto I/O error  |
+| 1    | usage error (bad arguments, validation failure) |
+| 2    | database error (duplicate email, unknown id, SQLite failure) |
+| 3    | proto I/O error (missing/corrupt `.pb` file) |
 
 ---
 
