@@ -1,7 +1,9 @@
 #include "roster_manager.h"
 
 #include <cstddef>
+#include <istream>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -89,9 +91,21 @@ void RosterManager::exportToFile(const std::string& path) const {
     saveRosterToProto(people, path);
 }
 
-int RosterManager::importFromFile(const std::string& path, ImportMode mode) {
-    std::vector<Person> incoming = loadRosterFromProto(path);
+void RosterManager::exportToStream(std::ostream& out) const {
+    // Same rule as exportToFile: export everyone, including inactive members.
+    const std::vector<Person> people = db_.listPeople(/*activeOnly=*/false);
+    saveRosterToProto(people, out);
+}
 
+int RosterManager::importFromFile(const std::string& path, ImportMode mode) {
+    return applyImport(loadRosterFromProto(path), mode);
+}
+
+int RosterManager::importFromStream(std::istream& in, ImportMode mode) {
+    return applyImport(loadRosterFromProto(in), mode);
+}
+
+int RosterManager::applyImport(std::vector<Person> incoming, ImportMode mode) {
     int affected = 0;
 
     if (mode == ImportMode::Replace) {

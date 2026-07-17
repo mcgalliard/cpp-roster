@@ -119,6 +119,60 @@ if(NOT Protobuf_FOUND)
 endif()
 
 # ===========================================================================
+# 2b. Web UI dependencies (header-only): nlohmann_json + cpp-httplib.
+#     Both are used only by src/http_server.cpp for the `roster serve` command.
+#     Prefer a system/package-provided config so offline machines and CI reuse
+#     an install; fall back to FetchContent otherwise.
+# ===========================================================================
+
+# nlohmann_json — installed here via MSYS2 pacman
+# (mingw-w64-ucrt-x86_64-nlohmann-json), which ships a CMake config.
+find_package(nlohmann_json 3 CONFIG QUIET)
+if(nlohmann_json_FOUND)
+    message(STATUS "nlohmann_json: using system package "
+                   "(nlohmann_json::nlohmann_json).")
+else()
+    message(STATUS "nlohmann_json: not found; fetching the single-header "
+                   "release via FetchContent (header-only, fast).")
+    set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        nlohmann_json
+        # The json.tar.xz release asset carries a CMake config exporting
+        # nlohmann_json::nlohmann_json; much smaller/faster than the git repo.
+        URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+    message(STATUS "nlohmann_json: built from FetchContent release v3.12.0.")
+endif()
+
+# cpp-httplib — NOT in MSYS2, so FetchContent is the normal path on this machine.
+# Try a system config first for other environments. Turn every optional backend
+# OFF so no OpenSSL / zlib / brotli dependency is dragged in (plain HTTP is all
+# the local UI needs).
+set(HTTPLIB_REQUIRE_OPENSSL OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_REQUIRE_ZLIB    OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_REQUIRE_BROTLI  OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_USE_OPENSSL_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_USE_ZLIB_IF_AVAILABLE    OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_USE_BROTLI_IF_AVAILABLE  OFF CACHE BOOL "" FORCE)
+
+find_package(httplib CONFIG QUIET)
+if(httplib_FOUND)
+    message(STATUS "cpp-httplib: using system package (httplib::httplib).")
+else()
+    message(STATUS "cpp-httplib: not found; fetching from GitHub via "
+                   "FetchContent (header-only).")
+    FetchContent_Declare(
+        httplib
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG        v0.18.7   # A stable v0.18.x release.
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(httplib)
+    message(STATUS "cpp-httplib: built from FetchContent (target httplib::httplib).")
+endif()
+
+# ===========================================================================
 # 3. Protobuf code generation (portable custom command; no protobuf_generate_cpp).
 # ===========================================================================
 set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
@@ -151,6 +205,7 @@ add_executable(roster
     src/database.cpp
     src/roster_manager.cpp
     src/proto_io.cpp
+    src/http_server.cpp
     ${PROTO_SRC}
 )
 
@@ -166,7 +221,16 @@ target_link_libraries(roster
     PRIVATE
         SQLite3::SQLite3
         protobuf::libprotobuf
+        httplib::httplib
+        nlohmann_json::nlohmann_json
 )
+
+# cpp-httplib needs the Winsock library. Its imported target usually carries
+# ws2_32 already, but link it explicitly on Windows so the build does not depend
+# on that (and so a system-config httplib without the link still resolves).
+if(WIN32)
+    target_link_libraries(roster PRIVATE ws2_32)
+endif()
 
 # ===========================================================================
 # 5. Warnings and compiler-specific flags.
@@ -197,3 +261,8 @@ if(WIN32 AND CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
 else()
     install(TARGETS roster RUNTIME DESTINATION bin)
 endif()
+
+# Ship the web UI next to the binary. The dist layout is then bin/roster.exe +
+# web/, which the server's next-to-executable lookup finds via its "../web"
+# candidate (see resolveWebRoot in http_server.cpp).
+install(DIRECTORY web DESTINATION .)

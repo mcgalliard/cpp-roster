@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iosfwd>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -29,6 +30,16 @@ private:
 void saveRosterToProto(const std::vector<Person>& people,
                        const std::string& path);
 
+// Stream overload: serializes `people` to `out` (same wire format and
+// exported_at stamping as the path version, which delegates here). Throws
+// ProtoIoException on failure. Used by the web export endpoint.
+void saveRosterToProto(const std::vector<Person>& people, std::ostream& out);
+
 // Parses a binary protobuf Roster message from `path` into a vector of Person.
 // Throws ProtoIoException on failure (missing file, parse error, etc.).
 std::vector<Person> loadRosterFromProto(const std::string& path);
+
+// Stream overload: parses a binary protobuf Roster message from `in` (the path
+// version delegates here). Throws ProtoIoException on parse failure. Used by the
+// web import endpoint.
+std::vector<Person> loadRosterFromProto(std::istream& in);

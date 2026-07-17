@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Roster Manager</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <h1 class="app-title">
+        <span class="app-title__mark">&#9679;</span>
+        Roster Manager
+      </h1>
+      <span id="count-badge" class="badge" title="People shown / total">0 people</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="toolbar">
+      <div class="toolbar__search">
+        <input
+          id="search"
+          type="search"
+          class="input"
+          placeholder="Search name, role, or email&hellip;"
+          autocomplete="off"
+          aria-label="Search people"
+        />
+      </div>
+      <label class="toggle">
+        <input id="active-only" type="checkbox" />
+        <span>Active only</span>
+      </label>
+      <div class="toolbar__actions">
+        <button id="btn-add" class="btn btn--primary" type="button">Add Person</button>
+        <button id="btn-import" class="btn" type="button">Import</button>
+        <button id="btn-export" class="btn" type="button">Export</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="people" aria-label="People">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Role</th>
+              <th scope="col">Email</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="people-body"><!-- rows rendered by app.js --></tbody>
+        </table>
+      </div>
+      <div id="empty-state" class="empty" hidden></div>
+    </div>
+  </main>
+
+  <!-- Add / Edit modal -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title" class="modal__title">Add Person</h2>
+      <form id="person-form" class="form" novalidate>
+        <div class="field">
+          <label for="f-first">First name <span class="req">*</span></label>
+          <input id="f-first" name="first" type="text" class="input" required />
+        </div>
+        <div class="field">
+          <label for="f-last">Last name <span class="req">*</span></label>
+          <input id="f-last" name="last" type="text" class="input" required />
+        </div>
+        <div class="field">
+          <label for="f-role">Role</label>
+          <input id="f-role" name="role" type="text" class="input" />
+        </div>
+        <div class="field">
+          <label for="f-email">Email</label>
+          <input id="f-email" name="email" type="text" class="input" />
+        </div>
+        <label class="toggle">
+          <input id="f-active" name="active" type="checkbox" checked />
+          <span>Active</span>
+        </label>
+        <p id="form-error" class="form-error" hidden></p>
+        <div class="modal__actions">
+          <button type="button" class="btn" data-close>Cancel</button>
+          <button type="submit" class="btn btn--primary" id="form-submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Import mode chooser -->
+  <div id="import-modal" class="modal" hidden>
+    <div class="modal__backdrop" data-close-import></div>
+    <div class="modal__dialog modal__dialog--sm" role="dialog" aria-modal="true" aria-labelledby="import-title">
+      <h2 id="import-title" class="modal__title">Import roster</h2>
+      <p class="modal__text">
+        How should <span id="import-filename" class="mono"></span> be applied?
+      </p>
+      <ul class="modal__hints">
+        <li><strong>Merge</strong> adds new people and updates existing ones matched by email.</li>
+        <li><strong>Replace</strong> clears the current roster first, then imports everyone.</li>
+      </ul>
+      <div class="modal__actions">
+        <button type="button" class="btn" data-close-import>Cancel</button>
+        <button type="button" class="btn" id="import-merge">Merge</button>
+        <button type="button" class="btn btn--danger" id="import-replace">Replace</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for import -->
+  <input id="import-file" type="file" accept=".pb,application/octet-stream" hidden />
+
+  <!-- Toast notifications -->
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "database.h"
+#include "http_server.h"
 #include "person.h"
 #include "proto_io.h"
 #include "roster_manager.h"
@@ -138,6 +139,7 @@ void printHelp() {
         "                    [--email <E>] [--active true|false]\n"
         "  export  --file <path.pb>\n"
         "  import  --file <path.pb> [--merge | --replace]   (default: merge)\n"
+        "  serve   [--port <N>]                             (default: 8090)\n"
         "  help    Show this message\n\n"
         "Exit codes: 0 success, 1 usage error, 2 database error, "
         "3 proto I/O error\n";
@@ -297,6 +299,31 @@ int cmdImport(RosterManager& mgr, const Options& opts) {
     return kOk;
 }
 
+int cmdServe(RosterManager& mgr, const Options& opts, const std::string& dbPath) {
+    int port = 8090;  // Default HTTP port for the web UI.
+    if (const std::optional<std::string> raw = opts.get("--port")) {
+        // Parse the port ourselves (rather than via requireInt) so we can add a
+        // range check with a tailored message; both problems are usage errors.
+        try {
+            std::size_t consumed = 0;
+            port = std::stoi(*raw, &consumed);
+            if (consumed != raw->size()) {
+                throw std::invalid_argument("trailing characters");
+            }
+        } catch (const std::exception&) {
+            throw UsageException("Option '--port' must be an integer, got '" +
+                                 *raw + "'.");
+        }
+        if (port < 1 || port > 65535) {
+            throw UsageException("Option '--port' must be between 1 and 65535, "
+                                 "got '" + *raw + "'.");
+        }
+    }
+    // runServer blocks until the process is interrupted; it returns a process
+    // exit code (0 on clean shutdown, non-zero if the port could not be bound).
+    return runServer(mgr, port, dbPath);
+}
+
 // Split the global --db option out of the token stream, returning the db path
 // (default "roster.db") and leaving the remaining tokens for the command. The
 // --db option may appear anywhere.
@@ -319,13 +346,14 @@ std::string extractDbPath(std::vector<std::string>& tokens) {
 // Dispatch one command. Throws typed exceptions on failure; returns exit code
 // on success/handled cases.
 int dispatch(const std::string& command, RosterManager& mgr,
-             const Options& opts) {
+             const Options& opts, const std::string& dbPath) {
     if (command == "add") return cmdAdd(mgr, opts);
     if (command == "remove") return cmdRemove(mgr, opts);
     if (command == "list") return cmdList(mgr, opts);
     if (command == "update") return cmdUpdate(mgr, opts);
     if (command == "export") return cmdExport(mgr, opts);
     if (command == "import") return cmdImport(mgr, opts);
+    if (command == "serve") return cmdServe(mgr, opts, dbPath);
     throw UsageException("Unknown command: '" + command +
                          "'. Run 'roster help' for usage.");
 }
@@ -374,7 +402,7 @@ int runCli(int argc, char** argv) {
 
         // Open the database only after argument parsing succeeds.
         RosterManager mgr(dbPath);
-        return dispatch(command, mgr, opts);
+        return dispatch(command, mgr, opts, dbPath);
 
     } catch (const UsageException& e) {
         std::cerr << "Error: " << e.what() << "\n";

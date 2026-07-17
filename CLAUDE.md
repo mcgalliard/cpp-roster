@@ -34,13 +34,18 @@ src/cli.h/.cpp           argv parsing, dispatch, table output, exception→exit-
 src/roster_manager.h/.cpp façade + validation (empty names, email sanity) + import/export orchestration
 src/database.h/.cpp      RAII sqlite3 wrapper — ALL SQL lives here, prepared statements only
 src/proto_io.h/.cpp      the ONLY code touching generated protobuf types; converts to/from Person
+src/http_server.h/.cpp   `roster serve` HTTP server + JSON REST API (httplib + nlohmann/json)
 src/person.h             plain struct shared everywhere
+web/                     static frontend (index.html, style.css, app.js) served by `serve`
 proto/roster.proto       source of truth for the interchange format
 ```
 
 Layering rules: `cli` never touches SQL or protobuf; `database` never does
 validation or I/O formatting; generated `roster.pb.h` is included only by
 `proto_io.cpp`. Generated sources go to `build/generated` — never commit them.
+`http_server` is a boundary like `cli`: it goes through `RosterManager` and
+`proto_io` only (no SQL, no generated protobuf types), translating exceptions
+into JSON error responses so a bad request never crashes the server.
 
 ## Conventions & invariants
 
@@ -58,6 +63,39 @@ validation or I/O formatting; generated `roster.pb.h` is included only by
   only with `--verbose`.
 - All sqlite binds use `SQLITE_TRANSIENT`; bind indexes are 1-based, column
   indexes 0-based.
+
+### Web server (`roster serve`)
+
+- **Thread-safety invariant:** httplib dispatches requests across a thread
+  pool, but the `RosterManager` / sqlite3 handle is **not** thread-safe. A
+  single `std::mutex` in `runServer` guards every `RosterManager` access; each
+  handler takes `std::lock_guard` for the whole read-modify-write. Never touch
+  `mgr` outside that lock.
+- **Static-file resolution order** (`resolveWebRoot` in `http_server.cpp`):
+  (1) `web/` relative to the current working directory (dev, run from repo
+  root), (2) `web/` next to the executable (build tree), (3) `../web` relative
+  to the executable (dist layout: `bin/roster.exe` + `web/`). On Windows the
+  exe path comes from `GetModuleFileNameW` (guarded by `#ifdef _WIN32`; POSIX
+  reads `/proc/self/exe`). If none exist, it logs a warning and serves the API
+  only. `install(DIRECTORY web DESTINATION .)` ships the UI into the dist tree.
+- Server binds to `127.0.0.1` only. The API JSON uses short keys
+  (`first`/`last`), distinct from the struct's `first_name`/`last_name`.
+- `proto_io` and `RosterManager` have **stream overloads**
+  (`saveRosterToProto`/`loadRosterFromProto` over `std::ostream`/`std::istream`;
+  `exportToStream`/`importFromStream`) so export/import reuse the exact CLI
+  serialization; the path versions delegate to them — do not duplicate.
+
+### Dependencies (this machine)
+
+- **SQLite3, Protobuf:** MSYS2 system packages (see above); FetchContent
+  fallbacks exist.
+- **nlohmann/json:** installed via `pacman`
+  (`mingw-w64-ucrt-x86_64-nlohmann-json`), found by `find_package(nlohmann_json
+  CONFIG)`; FetchContent release fallback otherwise.
+- **cpp-httplib:** NOT in MSYS2 — normally pulled by **FetchContent** (git tag
+  `v0.18.7`, `GIT_SHALLOW`). All optional backends (OpenSSL/zlib/brotli) are
+  forced OFF so nothing extra is dragged in. Links `httplib::httplib`,
+  `nlohmann_json::nlohmann_json`, and (Windows) `ws2_32`.
 
 ## Verifying changes
 

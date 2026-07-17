@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iosfwd>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -46,13 +47,27 @@ public:
     // Writes the current roster (all people, including inactive) to a proto file.
     void exportToFile(const std::string& path) const;
 
+    // Stream overload of exportToFile: serializes the whole roster (including
+    // inactive) to `out`. Used by the web export endpoint; the file version is
+    // unaffected.
+    void exportToStream(std::ostream& out) const;
+
     // Loads a proto file and applies it per `mode`. Returns the number of people
     // inserted or updated. Imported ids are never trusted.
     int importFromFile(const std::string& path, ImportMode mode);
 
+    // Stream overload of importFromFile: parses proto bytes from `in` and applies
+    // them per `mode`. Used by the web import endpoint. Shares the merge/replace
+    // logic with the file version. Returns the number of people affected.
+    int importFromStream(std::istream& in, ImportMode mode);
+
 private:
     // Validates a person for insert/update. Throws ValidationException on error.
     static void validate(const Person& person);
+
+    // Applies a parsed set of incoming people per `mode` (imported ids are never
+    // trusted). Shared by both import overloads. Returns the number affected.
+    int applyImport(std::vector<Person> incoming, ImportMode mode);
 
     Database db_;
 };
