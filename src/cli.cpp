@@ -235,7 +235,7 @@ int cmdRemove(RosterManager& mgr, const Options& opts) {
         return kOk;
     }
     std::cerr << "No person with id " << id << ".\n";
-    return kUsage;
+    return kDbError;
 }
 
 int cmdList(RosterManager& mgr, const Options& opts) {
@@ -249,7 +249,7 @@ int cmdUpdate(RosterManager& mgr, const Options& opts) {
     std::optional<Person> existing = mgr.getPerson(id);
     if (!existing) {
         std::cerr << "No person with id " << id << ".\n";
-        return kUsage;
+        return kDbError;
     }
 
     Person p = *existing;
@@ -265,7 +265,7 @@ int cmdUpdate(RosterManager& mgr, const Options& opts) {
     }
     // Row existed a moment ago; a false here means it vanished concurrently.
     std::cerr << "No person with id " << id << ".\n";
-    return kUsage;
+    return kDbError;
 }
 
 int cmdExport(RosterManager& mgr, const Options& opts) {
@@ -341,11 +341,18 @@ int runCli(int argc, char** argv) {
     }
 
     // A pre-scan for verbose so error reporting can honor it even if parsing of
-    // the rest fails.
+    // the rest fails. Being global, it is removed from the stream entirely so
+    // it may appear before or after the command.
     const bool verbose =
         std::find(tokens.begin(), tokens.end(), "--verbose") != tokens.end();
+    tokens.erase(std::remove(tokens.begin(), tokens.end(), "--verbose"),
+                 tokens.end());
 
     try {
+        // Extract the global --db option from wherever it sits (before or
+        // after the command) so the command token is whatever remains first.
+        const std::string dbPath = extractDbPath(tokens);
+
         if (tokens.empty()) {
             printHelp();
             return kUsage;  // No command given is a usage error.
@@ -358,12 +365,11 @@ int runCli(int argc, char** argv) {
             return kOk;
         }
 
-        // Pull the command token off the front, then extract the global --db
-        // option from wherever it sits, then parse the remaining options.
+        // Pull the command token off the front, then parse the remaining
+        // options.
         const std::string command = tokens.front();
         tokens.erase(tokens.begin());
 
-        const std::string dbPath = extractDbPath(tokens);
         const Options opts = parseOptions(tokens);
 
         // Open the database only after argument parsing succeeds.
