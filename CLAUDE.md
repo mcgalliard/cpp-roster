@@ -19,8 +19,11 @@ C:\msys64\usr\bin\bash.exe -lc "cd /c/Users/cpmcg/Documents/cpp-roster && cmake 
 - Output: `build/bin/roster.exe`. It links MinGW runtime DLLs, so it **only
   runs inside the UCRT64 environment** (or via the bash wrapper above).
 - `cmake --install build --prefix dist` (from the UCRT64 env) bundles the exe
-  plus all non-system DLLs into `dist/bin` — that copy runs from plain
-  PowerShell/Explorer. Re-run it after rebuilding if `dist` matters.
+  plus all non-system DLLs and the `web/` UI into `dist/` — that copy runs
+  from plain PowerShell/Explorer. Re-run it after rebuilding if `dist` matters.
+- Rule of thumb (the user runs from plain PowerShell): **UCRT64 shell →
+  `build/bin`, anywhere else → `dist/bin`**. Telling the user to run
+  `build\bin\roster.exe` from PowerShell will fail with a missing-DLL error.
 - CMake finds SQLite3 and Protobuf as MSYS2 system packages. The FetchContent
   fallbacks in CMakeLists.txt (SQLite amalgamation download; protobuf v25.3
   from source) exist for machines without them — don't exercise the protobuf
@@ -73,11 +76,16 @@ into JSON error responses so a bad request never crashes the server.
   `mgr` outside that lock.
 - **Static-file resolution order** (`resolveWebRoot` in `http_server.cpp`):
   (1) `web/` relative to the current working directory (dev, run from repo
-  root), (2) `web/` next to the executable (build tree), (3) `../web` relative
-  to the executable (dist layout: `bin/roster.exe` + `web/`). On Windows the
-  exe path comes from `GetModuleFileNameW` (guarded by `#ifdef _WIN32`; POSIX
-  reads `/proc/self/exe`). If none exist, it logs a warning and serves the API
-  only. `install(DIRECTORY web DESTINATION .)` ships the UI into the dist tree.
+  root), (2) `web/` next to the executable, (3) `../web` relative to the
+  executable — this is how both the build tree (`build/bin` + `build/web`) and
+  the dist layout (`bin/roster.exe` + `web/`) resolve. On Windows the exe path
+  comes from `GetModuleFileNameW` (guarded by `#ifdef _WIN32`; POSIX reads
+  `/proc/self/exe`). If none exist, it logs a warning and serves the API only.
+- A POST_BUILD step mirrors `web/` into `build/web`, and
+  `install(DIRECTORY web DESTINATION .)` ships it into `dist/`. The build-tree
+  copy refreshes only when the exe relinks — when live-editing `web/` files,
+  run the server from the repo root so the cwd lookup picks up changes without
+  a rebuild.
 - Server binds to `127.0.0.1` only. The API JSON uses short keys
   (`first`/`last`), distinct from the struct's `first_name`/`last_name`.
 - `proto_io` and `RosterManager` have **stream overloads**
@@ -106,5 +114,13 @@ without email), duplicate-email rejection (exit 2), missing-arg usage error
 export, import `--replace` and `--merge` into a second scratch DB, import of a
 nonexistent file (exit 3), and `--verbose` output. Check `$?`/`$LASTEXITCODE`
 explicitly — the exit-code contract is part of the interface.
+
+For `serve`/web changes, additionally: start the server on a scratch `--db`
+and non-default port, curl the API happy paths **and** error mappings (400
+validation, 409 duplicate email, 404 unknown id, 400 garbage import), do a
+binary export→import round-trip, load the UI in the browser preview (check
+console for errors, exercise add/edit/search/filter), and confirm no
+horizontal scroll at 375px. Kill the server when done (`taskkill /IM
+roster.exe /F` from PowerShell if needed).
 
 `*.db` and `*.pb` are gitignored; keep it that way.

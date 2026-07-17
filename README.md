@@ -45,10 +45,14 @@ step from the UCRT64 shell:
 cmake --install build --prefix dist
 ```
 
-This copies `roster.exe` plus every non-system DLL it needs into `dist/bin`.
-Note that `roster` is a console program: double-clicking it just flashes a
-window; run it from a terminal (`.\dist\bin\roster.exe help` works from plain
-PowerShell or cmd).
+This copies `roster.exe` plus every non-system DLL it needs into `dist/bin`,
+and the `web/` UI folder next to it. Note that `roster` is a console program:
+double-clicking it just flashes a window; run it from a terminal
+(`.\dist\bin\roster.exe help` works from plain PowerShell or cmd).
+
+**Rule of thumb:** inside the UCRT64 shell use `build/bin/roster.exe`;
+everywhere else (plain PowerShell, cmd, Explorer) use `dist\bin\roster.exe`,
+and re-run the install step after rebuilding to refresh it.
 
 ### (b) Visual Studio 2022 Build Tools + vcpkg
 
@@ -142,6 +146,12 @@ and opens a self-contained, framework-free web UI at
 REST API; run it until you press Ctrl+C. The UI lists, searches, filters, adds,
 edits, and deletes people, and imports/exports the same `.pb` files the CLI
 uses.
+
+On Windows, launch it as `.\dist\bin\roster.exe serve` from a normal terminal
+(the `build/bin` exe only runs inside the UCRT64 shell — see the rule of thumb
+above). The server finds `web/` next to itself; both the build tree and `dist`
+carry a copy, and running from the repo root uses the checked-out `web/`
+directly (handy when editing the frontend — just refresh the browser).
 
 The server binds to `127.0.0.1` only (loopback), and requests are serialized
 onto the single database connection with a mutex, so it is safe to leave
